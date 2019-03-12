@@ -1,0 +1,6 @@
+<launch>
+    <node pkg="beginner_tutorials" type="cluster_extraction" name="cluster_extraction" output="screen"/>
+    <node pkg="rosbag" type="play" name="player" output="screen" args="-q -r 1 /home/denny1232/catkin_ws/bagfiles/2019-02-25-14-08-54.bag"/>
+    <node type="rviz" name="rviz" pkg="rviz" />
+</launch>
+
