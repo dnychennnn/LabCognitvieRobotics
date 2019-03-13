@@ -1,6 +1,6 @@
 <launch>
     <node pkg="beginner_tutorials" type="cluster_extraction" name="cluster_extraction" output="screen"/>
-    <node pkg="rosbag" type="play" name="player" output="screen" args="-q -r .5 "../bagfiles/2019-03-13-11-10-03.bag"/>
+    <node pkg="rosbag" type="play" name="player" output="screen" args="-q -r .5 $(find beginner_tutorials)/bagfiles/2019-03-13-11-10-03.bag"/>
     <node type="rviz" name="rviz" pkg="rviz" />
 </launch>
 
