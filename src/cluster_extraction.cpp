@@ -6,6 +6,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl/search/kdtree.h>
 #include <pcl/sample_consensus/method_types.h>
@@ -17,6 +18,7 @@
 #include <pcl/common/impl/centroid.hpp>
 #include <pcl/filters/passthrough.h>
 #include "kalman_filter.h"
+
 
 using namespace std;
 using Eigen::MatrixXd;
@@ -66,7 +68,7 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr passThroughFilter(pcl::PointCloud<pcl::Poin
     pcl::PassThrough<pcl::PointXYZI> pass;
     pass.setInputCloud (cloud);
     pass.setFilterFieldName ("x");
-    pass.setFilterLimits (3.0, 11.0);
+    pass.setFilterLimits (2.0, 11.0);
     pass.filter (*cloud);
     pass.setInputCloud (cloud);
     pass.setFilterFieldName("y");
@@ -85,10 +87,9 @@ std::vector<pcl::PointIndices> euclidean_cluster(pcl::PointCloud<pcl::PointXYZI>
   std::vector<pcl::PointIndices> cluster_indices;
 
   pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-  ec.setClusterTolerance (1); // 1m
-  ec.setMinClusterSize (3);
-  ec.setMaxClusterSize (10);//Declare Kalman Filter Parameters
-KalmanFilter *ekf_;
+  ec.setClusterTolerance (0.2); // 1m
+  ec.setMinClusterSize (5); // 3
+  ec.setMaxClusterSize (50); // 10
   ec.setSearchMethod (tree);
   ec.setInputCloud (cloud);
   ec.extract (cluster_indices);
@@ -97,9 +98,6 @@ KalmanFilter *ekf_;
 
   return cluster_indices;
 }
-
-float prev_x = 1.f;
-float prev_y = 1.f; 
 
 visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster, std::string ns ,int id, float r, float g, float b, KalmanFilter *ekf_) 
 { 
@@ -121,7 +119,7 @@ visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr clo
     max[2] = std::max( cloud_cluster->points[i].z, max[2] ); 
   }
 
-  centroid =( max + min) /2.f;
+  centroid =(max + min) /2.f;
 
   // //kalman filter
   float dt = 1/30.f;
@@ -137,7 +135,7 @@ visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr clo
   ekf_->Update(z);
   // std::cout << "ekf x: " << ekf_->x_ <<std::endl;
 
-  ROS_INFO_STREAM( "update state: " << "\n" << ekf_->x_ << "\n" << "update P: " <<"\n" << ekf_->P_ << std::endl);
+  // ROS_INFO_STREAM( "update state: " << "\n" << ekf_->x_ << "\n" << "update P: " <<"\n" << ekf_->P_ << std::endl);
 
   uint32_t shape = visualization_msgs::Marker::CUBE; 
   visualization_msgs::Marker marker; 
@@ -150,8 +148,8 @@ visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr clo
   marker.type = shape; 
   marker.action = visualization_msgs::Marker::ADD; 
   
-  marker.pose.position.x = ekf_->x_[0]; 
-  marker.pose.position.y = ekf_->x_[1]; 
+  marker.pose.position.x = ekf_->x_[0];//centroid[0];// 
+  marker.pose.position.y = ekf_->x_[1]; //centroid[1]; 
   marker.pose.position.z = centroid[2]; 
   marker.pose.orientation.x = 0.0; 
   marker.pose.orientation.y = 0.0; 
@@ -193,11 +191,11 @@ public:
 
     //Topic you want to publish
     pub_ = n_.advertise<sensor_msgs::PointCloud2>("/cloud_cluster", 1);
-
+    pub_passthroughfilter_ = n_.advertise<sensor_msgs::PointCloud2>("/passthrough", 1);
     pub_marker_ = n_.advertise<visualization_msgs::Marker>("/bounding_box", 1);
 
     //Topic you want to subscribe
-    sub_ = n_.subscribe("/mmWaveDataHdl/RScan", 1, &SubscribeAndPublish::callback, this);
+    sub_ = n_.subscribe("/ti_mmwave/radar_scan_pcl", 1, &SubscribeAndPublish::callback, this);
 
     //kalman filter Initialization
     // set measurement noises
@@ -266,10 +264,15 @@ public:
     // ROS_INFO("+++++++++++++++++++++SUMMARY++++++++++++++++++++++++ %d", count_valid);
 
 
-
     // sorted out noise with passthrough filter
-    // cloud = passThroughFilter(cloud);
+    cloud = passThroughFilter(cloud);
+    
+    sensor_msgs::PointCloud2 filtered_cloud;
+    pcl::PCLPointCloud2 pcl_pc2_filtered;
 
+    pcl::toPCLPointCloud2(*cloud, pcl_pc2_filtered);
+    pcl_conversions::fromPCL(pcl_pc2_filtered, filtered_cloud);
+    pub_passthroughfilter_.publish(filtered_cloud);
 
     // Euclidean Clustering
     std::vector<pcl::PointIndices> cluster_indices;
@@ -330,6 +333,7 @@ public:
 private:
   ros::NodeHandle n_; 
   ros::Publisher pub_;
+  ros::Publisher pub_passthroughfilter_;
   ros::Publisher pub_marker_;
   ros::Subscriber sub_;
 
