@@ -148,8 +148,8 @@ visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr clo
   marker.type = shape; 
   marker.action = visualization_msgs::Marker::ADD; 
   
-  marker.pose.position.x = ekf_->x_[0];//centroid[0];// 
-  marker.pose.position.y = ekf_->x_[1]; //centroid[1]; 
+  marker.pose.position.x = centroid[0];//ekf_->x_[0];
+  marker.pose.position.y = centroid[1];//ekf_->x_[1]; // 
   marker.pose.position.z = centroid[2]; 
   marker.pose.orientation.x = 0.0; 
   marker.pose.orientation.y = 0.0; 
@@ -175,7 +175,7 @@ visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr clo
   marker.color.a = 0.5; 
 
   marker.lifetime = ros::Duration(); 
-  marker.lifetime = ros::Duration(2.0); 
+  // marker.lifetime = ros::Duration(2.0); 
   return marker; 
 }
 
@@ -281,7 +281,6 @@ public:
     pcl::PointCloud<pcl::PointXYZI>::Ptr drone_cloud (new pcl::PointCloud<pcl::PointXYZI>);
     int max_points_cloud = 0; // record the number of most points cloud 
 
-    int j = 0;
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
       pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
@@ -306,7 +305,6 @@ public:
       // merge the clusters
       *clustered_cloud += *cloud_cluster;
 
-      j++;
     }
 
     // publish the clusters
