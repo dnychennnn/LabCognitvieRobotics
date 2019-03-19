@@ -63,7 +63,7 @@ MatrixXd CalculateJacobian(const VectorXd& x_state) {
 
 }
 
-pcl::PointCloud<pcl::PointXYZI>::Ptr passThroughFilter(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud){
+pcl::PointCloud<pcl::PointXYZI>::Ptr passThroughFilterBox(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud){
     // Create the filtering object
     pcl::PassThrough<pcl::PointXYZI> pass;
     pass.setInputCloud (cloud);
@@ -76,6 +76,20 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr passThroughFilter(pcl::PointCloud<pcl::Poin
     pass.filter (*cloud);
 
     return cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZI>::Ptr passThroughFilterDistance(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud, float min_valid_distance, float max_valid_distance){
+  // Create the filtering object
+  pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud (new pcl::PointCloud<pcl::PointXYZI>);
+  for(const auto& point : cloud->points)
+  {
+    float distance = sqrtf(point.x * point.x + point.y * point.y + point.z * point.z);
+    if(distance >= min_valid_distance && distance <= max_valid_distance)
+      filtered_cloud->push_back(point);
+  }
+
+  filtered_cloud->header = cloud->header;
+  return filtered_cloud;
 }
 
 std::vector<pcl::PointIndices> euclidean_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud){
@@ -133,9 +147,9 @@ visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr clo
   // ekf_->H_ = CalculateJacobian(ekf_->x_);
 
   ekf_->Update(z);
-  // std::cout << "ekf x: " << ekf_->x_ <<std::endl;
+  std::cout << "ekf x: " << ekf_->x_ <<std::endl;
 
-  // ROS_INFO_STREAM( "update state: " << "\n" << ekf_->x_ << "\n" << "update P: " <<"\n" << ekf_->P_ << std::endl);
+  ROS_INFO_STREAM( "update state: " << "\n" << ekf_->x_ << "\n" << "update P: " <<"\n" << ekf_->P_ << std::endl);
 
   uint32_t shape = visualization_msgs::Marker::CUBE; 
   visualization_msgs::Marker marker; 
@@ -148,8 +162,10 @@ visualization_msgs::Marker mark_cluster(pcl::PointCloud<pcl::PointXYZI>::Ptr clo
   marker.type = shape; 
   marker.action = visualization_msgs::Marker::ADD; 
   
-  marker.pose.position.x = centroid[0];//ekf_->x_[0];
-  marker.pose.position.y = centroid[1];//ekf_->x_[1]; // 
+  // marker.pose.position.x = ekf_->x_[0];// kalman filter
+  // marker.pose.position.y = ekf_->x_[1];//
+  marker.pose.position.x = centroid[0];// only clustering
+  marker.pose.position.y = centroid[1];//
   marker.pose.position.z = centroid[2]; 
   marker.pose.orientation.x = 0.0; 
   marker.pose.orientation.y = 0.0; 
@@ -265,7 +281,9 @@ public:
 
 
     // sorted out noise with passthrough filter
-    cloud = passThroughFilter(cloud);
+    float min_valid_distance = 2.0f;
+    float max_valid_distance = 11.0f;
+    cloud = passThroughFilterDistance(cloud, min_valid_distance, max_valid_distance);
     
     sensor_msgs::PointCloud2 filtered_cloud;
     pcl::PCLPointCloud2 pcl_pc2_filtered;
